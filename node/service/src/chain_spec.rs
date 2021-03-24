@@ -1793,3 +1793,157 @@ pub fn rococo_local_testnet_config() -> Result<RococoChainSpec, String> {
 		Default::default(),
 	))
 }
+
+pub fn balala_config() -> Result<PolkadotChainSpec, String> {
+	PolkadotChainSpec::from_json_bytes(&include_bytes!("../res/balala.json")[..])
+}
+
+pub fn balala_build_genesis_config() -> Result<RococoChainSpec, String> {
+	Ok(RococoChainSpec::from_genesis(
+		"Balala",
+		"rococo",
+		ChainType::Live,
+		move || RococoGenesisExt {
+			runtime_genesis_config: {
+				const TEAM_MEMBERS: &[&'static str] = &[
+					// Huiyi
+					"0x281b7ec1e05feb46457caa9c54cef0ebdaf7f65d31fd6ed740a34dbc9875304c",
+					// Ron
+					"0x9cf0c0ea7488a17e348f0abba9c229032f3240a793ffcfbedc4b46db0aeb306c",
+					// Cheng
+					"0x922b6854052ba1084c74dd323ee70047d58ae4eb068f20bc251831f1ec109030",
+					// Jane
+					"0xb26268877f72c4dcd9c2459a99dde0d2caf5a816c6b4cd3bd1721252b26f4909",
+					// Cai
+					"0xf41d3260d736f5b3db8a6351766e97619ea35972546a5f850bbf0b27764abe03",
+					// Tiny
+					"0xf29638cb649d469c317a4c64381e179d5f64ef4d30207b4c52f2725c9d2ec533",
+					// Eve
+					"0x1a7008a33fa595398b509ef56841db3340931c28a42881e36c9f34b1f15f9271",
+					// Yuqi
+					"0x500e3197e075610c1925ddcd86d66836bf93ae0a476c64f56f611afc7d64d16f",
+					// Aki
+					"0x129f002b1c0787ea72c31b2dc986e66911fe1b4d6dc16f83a1127f33e5a74c7d",
+					// Alex
+					"0x26fe37ba5d35ac650ba37c5cc84525ed135e772063941ae221a1caca192fff49",
+					// Shell
+					"0x187c272f576b1999d6cf3dd529b59b832db12125b43e57fb088677eb0c570a6b",
+					// Xavier
+					"0xb4f7f03bebc56ebe96bc52ea5ed3159d45a0ce3a8d7f082983c33ef133274747",
+				];
+
+				let wasm_binary = rococo::WASM_BINARY.unwrap();
+				let initial_authorities = vec![
+					get_authority_keys_from_seed("Alice"),
+					get_authority_keys_from_seed("Bob"),
+				];
+				let root = AccountId::from(array_bytes::hex2array_unchecked!(
+					"0x72819fbc1b93196fa230243947c1726cbea7e33044c7eb6f736ff345561f9e4c",
+					32
+				));
+				let endowed_accounts = vec![
+					(root.clone(), 1_000_000 * DOTS),
+					(get_account_id_from_seed::<sr25519::Public>("Alice//stash"), DOTS),
+					(get_account_id_from_seed::<sr25519::Public>("Bob//stash"), DOTS),
+				]
+				.into_iter()
+				.chain(TEAM_MEMBERS.iter().map(|m| {
+					(
+						array_bytes::hex2array_unchecked!(m, 32).into(),
+						1_000_000 * DOTS,
+					)
+				}))
+				.collect();
+
+				rococo_runtime::GenesisConfig {
+					frame_system: rococo_runtime::SystemConfig {
+						code: wasm_binary.to_vec(),
+						changes_trie_config: Default::default(),
+					},
+					pallet_indices: rococo_runtime::IndicesConfig { indices: vec![] },
+					pallet_balances: rococo_runtime::BalancesConfig {
+						balances: endowed_accounts,
+					},
+					pallet_session: rococo_runtime::SessionConfig {
+						keys: initial_authorities
+							.iter()
+							.map(|x| {
+								(
+									x.0.clone(),
+									x.0.clone(),
+									rococo_session_keys(
+										x.2.clone(),
+										x.3.clone(),
+										x.4.clone(),
+										x.5.clone(),
+										x.6.clone(),
+										x.7.clone(),
+									),
+								)
+							})
+							.collect::<Vec<_>>(),
+					},
+					pallet_babe: rococo_runtime::BabeConfig {
+						authorities: Default::default(),
+						epoch_config: Some(rococo_runtime::BABE_GENESIS_EPOCH_CONFIG),
+					},
+					pallet_grandpa: Default::default(),
+					pallet_im_online: Default::default(),
+					pallet_authority_discovery: rococo_runtime::AuthorityDiscoveryConfig {
+						keys: vec![],
+					},
+					pallet_sudo: rococo_runtime::SudoConfig { key: root },
+					parachains_configuration: rococo_runtime::ParachainsConfigurationConfig {
+						config: polkadot_runtime_parachains::configuration::HostConfiguration {
+							validation_upgrade_frequency: 600u32,
+							validation_upgrade_delay: 300,
+							acceptance_period: 1200,
+							max_code_size: 5 * 1024 * 1024,
+							max_pov_size: 50 * 1024 * 1024,
+							max_head_data_size: 32 * 1024,
+							group_rotation_frequency: 20,
+							chain_availability_period: 4,
+							thread_availability_period: 4,
+							max_upward_queue_count: 8,
+							max_upward_queue_size: 8 * 1024,
+							max_downward_message_size: 1024,
+							// this is approximatelly 4ms.
+							//
+							// Same as `4 * frame_support::weights::WEIGHT_PER_MILLIS`. We don't bother with
+							// an import since that's a made up number and should be replaced with a constant
+							// obtained by benchmarking anyway.
+							preferred_dispatchable_upward_messages_step_weight: 4 * 1_000_000_000,
+							max_upward_message_size: 1024,
+							max_upward_message_num_per_candidate: 5,
+							hrmp_open_request_ttl: 5,
+							hrmp_sender_deposit: 0,
+							hrmp_recipient_deposit: 0,
+							hrmp_channel_max_capacity: 8,
+							hrmp_channel_max_total_size: 8 * 1024,
+							hrmp_max_parachain_inbound_channels: 4,
+							hrmp_max_parathread_inbound_channels: 4,
+							hrmp_channel_max_message_size: 1024,
+							hrmp_max_parachain_outbound_channels: 4,
+							hrmp_max_parathread_outbound_channels: 4,
+							hrmp_max_message_num_per_candidate: 5,
+							dispute_period: 6,
+							no_show_slots: 2,
+							n_delay_tranches: 25,
+							needed_approvals: 2,
+							relay_vrf_modulo_samples: 10,
+							zeroth_delay_tranche_width: 0,
+							..Default::default()
+						},
+					},
+				}
+			},
+			// Use 1 minute session length.
+			session_length_in_blocks: Some(10),
+		},
+		vec![],
+		None,
+		Some(DEFAULT_PROTOCOL_ID),
+		None,
+		Default::default(),
+	))
+}

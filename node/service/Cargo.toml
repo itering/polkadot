@@ -5,6 +5,8 @@ authors = ["Parity Technologies <admin@parity.io>"]
 edition = "2018"
 
 [dependencies]
+array-bytes = { version = "1.1.0" }
+
 # Substrate Client
 sc-authority-discovery = { git = "https://github.com/paritytech/substrate", branch = "rococo-v1" }
 babe = { package = "sc-consensus-babe", git = "https://github.com/paritytech/substrate", branch = "rococo-v1" }
