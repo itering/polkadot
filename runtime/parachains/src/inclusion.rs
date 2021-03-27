@@ -450,6 +450,12 @@ impl<T: Config> Module<T> {
 					// A candidate for a parachain without current validation code is not scheduled.
 					.ok_or_else(|| Error::<T>::UnscheduledCandidate)?;
 				let validation_code_hash = validation_code.hash();
+				log::debug!(
+					target: "guitest",
+					"!!!!!!!!!!!!! inclusion check {}\n{}",
+					validation_code_hash,
+					candidate.descriptor().validation_code_hash,
+				);
 				ensure!(
 					candidate.descriptor().validation_code_hash == validation_code_hash,
 					Error::<T>::InvalidValidationCodeHash,

@@ -290,6 +290,12 @@ async fn handle_new_activations<Context: SubsystemContext>(
 
 				let pov_hash = collation.proof_of_validity.hash();
 
+				tracing::info!(
+					target: "guitest",
+					"!!!!!!!!!!!!!!!!!!!!!!!!!!!!! handle new activation with code hash: {}",
+					collation.validation_code_hash,
+				);
+
 				let signature_payload = collator_signature_payload(
 					&relay_parent,
 					&scheduled_core.para_id,

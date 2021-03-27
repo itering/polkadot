@@ -380,6 +380,17 @@ fn perform_basic_checks(
 		return Err(InvalidCandidate::HashMismatch);
 	}
 
+	tracing::info!(
+		target: "guitest",
+		"!!!!!!!!!!!!!!!!!!!!!!!!!!!!! perform_basic_checks with code hash: {}",
+		candidate.validation_code_hash,
+	);
+	tracing::info!(
+		target: "guitest",
+		"!!!!!!!!!!!!!!!!!!!!!!!!!!!!! perform_basic_checks check with code hash: {}",
+		validation_code_hash,
+	);
+
 	if validation_code_hash != candidate.validation_code_hash {
 		return Err(InvalidCandidate::CodeHashMismatch);
 	}
