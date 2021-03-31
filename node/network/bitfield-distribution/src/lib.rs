@@ -31,7 +31,10 @@ use polkadot_subsystem::{
 	SubsystemContext, SubsystemResult,
 	jaeger,
 };
-use polkadot_node_subsystem_util::metrics::{self, prometheus};
+use polkadot_node_subsystem_util::{
+	metrics::{self, prometheus},
+	self as util, MIN_GOSSIP_PEERS,
+};
 use polkadot_primitives::v1::{Hash, SignedAvailabilityBitfield, SigningContext, ValidatorId};
 use polkadot_node_network_protocol::{v1 as protocol_v1, PeerId, View, UnifiedReputationChange as Rep, OurView};
 use std::collections::{HashMap, HashSet};
@@ -192,9 +195,11 @@ impl BitfieldDistribution {
 				FromOverseer::Signal(OverseerSignal::ActiveLeaves(ActiveLeavesUpdate { activated, .. })) => {
 					let _timer = self.metrics.time_active_leaves_update();
 
-					for (relay_parent, span) in activated {
+					for activated in activated {
+						let relay_parent = activated.hash;
+
 						tracing::trace!(target: LOG_TARGET, relay_parent = %relay_parent, "activated");
-						let span = PerLeafSpan::new(span, "bitfield-distribution");
+						let span = PerLeafSpan::new(activated.span, "bitfield-distribution");
 						let _span = span.child("query-basics");
 
 						// query validator set and signing context per relay_parent once only
@@ -356,6 +361,7 @@ where
 			}
 		})
 		.collect::<Vec<PeerId>>();
+	let interested_peers = util::choose_random_sqrt_subset(interested_peers, MIN_GOSSIP_PEERS);
 	drop(_span);
 
 	if interested_peers.is_empty() {

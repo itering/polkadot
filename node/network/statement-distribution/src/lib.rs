@@ -31,7 +31,10 @@ use polkadot_subsystem::{
 		RuntimeApiMessage, RuntimeApiRequest, NetworkBridgeEvent,
 	},
 };
-use polkadot_node_subsystem_util::metrics::{self, prometheus};
+use polkadot_node_subsystem_util::{
+	metrics::{self, prometheus},
+	MIN_GOSSIP_PEERS,
+};
 use polkadot_node_primitives::{SignedFullStatement};
 use polkadot_primitives::v1::{
 	Hash, CompactStatement, ValidatorIndex, ValidatorId, SigningContext, ValidatorSignature, CandidateHash,
@@ -620,13 +623,12 @@ async fn circulate_statement(
 ) -> Vec<PeerId> {
 	let fingerprint = stored.fingerprint();
 
-	let mut peers_to_send = HashMap::new();
+	let len_sqrt = (peers.len() as f64).sqrt() as usize;
+	let cap = std::cmp::max(MIN_GOSSIP_PEERS, len_sqrt);
 
-	for (peer, data) in peers.iter_mut() {
-		if let Some(new_known) = data.send(&relay_parent, &fingerprint) {
-			peers_to_send.insert(peer.clone(), new_known);
-		}
-	}
+	let peers_to_send: HashMap<PeerId, bool> = peers.iter_mut().filter_map(|(peer, data)| {
+		data.send(&relay_parent, &fingerprint).map(|new| (peer.clone(), new))
+	}).take(cap).collect();
 
 	// Send all these peers the initial statement.
 	if !peers_to_send.is_empty() {
@@ -1016,8 +1018,9 @@ impl StatementDistribution {
 				FromOverseer::Signal(OverseerSignal::ActiveLeaves(ActiveLeavesUpdate { activated, .. })) => {
 					let _timer = metrics.time_active_leaves_update();
 
-					for (relay_parent, span) in activated {
-						let span = PerLeafSpan::new(span, "statement-distribution");
+					for activated in activated {
+						let relay_parent = activated.hash;
+						let span = PerLeafSpan::new(activated.span, "statement-distribution");
 
 						let (validators, session_index) = {
 							let (val_tx, val_rx) = oneshot::channel();
@@ -1187,7 +1190,7 @@ mod tests {
 	use sp_keystore::{CryptoStore, SyncCryptoStorePtr, SyncCryptoStore};
 	use sc_keystore::LocalKeystore;
 	use polkadot_node_network_protocol::{view, ObservedRole, our_view};
-	use polkadot_subsystem::jaeger;
+	use polkadot_subsystem::{jaeger, ActivatedLeaf};
 
 	#[test]
 	fn active_head_accepts_only_2_seconded_per_validator() {
@@ -1743,7 +1746,11 @@ mod tests {
 		let test_fut = async move {
 			// register our active heads.
 			handle.send(FromOverseer::Signal(OverseerSignal::ActiveLeaves(ActiveLeavesUpdate {
-				activated: vec![(hash_a, Arc::new(jaeger::Span::Disabled))].into(),
+				activated: vec![ActivatedLeaf {
+					hash: hash_a,
+					number: 1,
+					span: Arc::new(jaeger::Span::Disabled),
+				}].into(),
 				deactivated: vec![].into(),
 			}))).await;
 
